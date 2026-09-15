@@ -6,7 +6,10 @@
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "strict": true,
+    // type-check vite.config.ts only — emitting it would produce a
+    // vite.config.js that Vite loads in preference to the .ts source
+    "noEmit": true
   },
   "include": ["vite.config.ts"]
 }

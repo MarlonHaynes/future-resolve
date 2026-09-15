@@ -5,9 +5,14 @@ import { env } from "./env.js";
 // from .env.example, we still construct the pool (so the server boots and
 // serves static/health routes) but every query will fail loudly and clearly
 // until a real connection string is provided.
+// Supabase (and most hosted Postgres) require TLS. Setting ssl here means the
+// connection string doesn't need ?sslmode=require. rejectUnauthorized: false
+// skips CA verification, which is what hosted providers using their own chain
+// generally need — the traffic is still encrypted.
 export const pool = new pg.Pool({
   connectionString: env.databaseUrl || undefined,
   max: 10,
+  ssl: { rejectUnauthorized: false },
 });
 
 pool.on("error", (err) => {
