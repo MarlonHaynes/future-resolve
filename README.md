@@ -48,7 +48,7 @@ the only path that calls the real Gemini API.
    npm run migrate
    ```
 
-4. **Seed demo data** (~60 classified tickets, 5 agents + 1 admin, SLA policies, 8 KB articles):
+4. **Seed demo data** (140 classified tickets, 5 agents + 1 admin, SLA policies, 8 KB articles):
    ```bash
    npm run seed
    ```

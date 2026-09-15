@@ -1,6 +1,7 @@
 export type Role = "admin" | "agent";
 export type TicketStatus = "open" | "in_progress" | "resolved";
 export type Priority = "low" | "med" | "high" | "urgent";
+export type SlaOutcome = "escalated" | "auto_resolved" | "restarted" | "breached_final";
 
 export interface Agent {
   id: string;
@@ -41,6 +42,8 @@ export interface Ticket {
   suggested_kb_article_id: string | null;
   classification_source: "gemini" | "mock" | null;
   sla_breach_logged: boolean;
+  sla_outcome: SlaOutcome | null;
+  sla_breach_count: number;
 }
 
 export interface TicketEvent {

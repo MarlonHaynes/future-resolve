@@ -8,6 +8,10 @@ const TYPE_LABELS: Record<string, string> = {
   status_changed: "Status Changed",
   priority_changed: "Priority Changed",
   sla_breach: "SLA Breached",
+  sla_escalated: "SLA Escalated",
+  sla_restarted: "SLA Clock Restarted",
+  sla_auto_resolved: "Auto-resolved",
+  sla_breached_final: "Breach — No Action",
 };
 
 export function EventTimeline({ events }: { events: TicketEvent[] }) {

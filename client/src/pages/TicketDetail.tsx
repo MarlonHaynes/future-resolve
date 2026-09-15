@@ -7,6 +7,8 @@ import { PriorityBadge } from "../components/PriorityBadge";
 import { SlaCountdown } from "../components/SlaCountdown";
 import { ClassificationPanel } from "../components/ClassificationPanel";
 import { EventTimeline } from "../components/EventTimeline";
+import { SlaOutcomeBadge } from "../components/SlaOutcomeBadge";
+import { useSlaExpiry } from "../hooks/useSlaExpiry";
 import { useAuth } from "../context/AuthContext";
 
 export function TicketDetail() {
@@ -34,6 +36,7 @@ export function TicketDetail() {
   }
 
   useEffect(load, [id]);
+  const handleSlaExpire = useSlaExpiry(load);
   useEffect(() => {
     api.get<{ agents: Agent[] }>("/agents").then((r) => setAgents(r.agents));
   }, []);
@@ -91,6 +94,10 @@ export function TicketDetail() {
               {ticket.category}
             </span>
             {ticket.breached && <span className="badge breach-badge">SLA Breached</span>}
+            {/* "breached_final" on a still-overdue ticket would just repeat the badge above */}
+            {ticket.sla_outcome && !(ticket.sla_outcome === "breached_final" && ticket.breached) && (
+              <SlaOutcomeBadge outcome={ticket.sla_outcome} />
+            )}
           </div>
         </div>
         {currentAgent?.role === "admin" && (
@@ -142,10 +149,17 @@ export function TicketDetail() {
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
               <label>SLA</label>
-              <SlaCountdown deadline={ticket.sla_deadline} resolved={ticket.status === "resolved"} />
+              <SlaCountdown
+                deadline={ticket.sla_deadline}
+                resolved={ticket.status === "resolved"}
+                outcome={ticket.sla_outcome}
+                onExpire={() => handleSlaExpire(ticket.id)}
+              />
               {ticket.sla_deadline && (
                 <span className="muted" style={{ fontSize: 12 }}>
                   Deadline: {new Date(ticket.sla_deadline).toLocaleString()}
+                  {ticket.sla_breach_count > 0 &&
+                    ` · ${ticket.sla_breach_count} SLA breach${ticket.sla_breach_count === 1 ? "" : "es"} handled`}
                 </span>
               )}
             </div>

@@ -3,7 +3,7 @@ import { pool } from "../db.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { classifyTicket } from "../services/classifier.js";
-import { computeSlaDeadline } from "../services/sla.js";
+import { computeSlaDeadline, handleSlaBreach } from "../services/sla.js";
 import { decrementWorkload, incrementWorkload, pickLeastLoadedAgent } from "../services/routing.js";
 import { Priority, TicketStatus } from "../types.js";
 
@@ -11,9 +11,18 @@ export const ticketsRouter = Router();
 ticketsRouter.use(requireAuth);
 
 // ----------------------------------------------------------------------------
-// GET /api/tickets — list + filter. Adds a computed `breached` boolean so the
-// frontend doesn't need to duplicate the "past deadline and unresolved" logic.
+// GET /api/tickets — list + filter + paginate. Adds a computed `breached`
+// boolean so the frontend doesn't need to duplicate the "past deadline and
+// unresolved" logic.
+//
+// Query: status, category, priority, assignedAgentId, page (1-based), pageSize.
+// Filters apply to the full table first; `total`, `openCount` and
+// `breachedCount` always describe the whole filtered set, and only `tickets`
+// is limited to the requested page. Omitting pageSize returns every match.
 // ----------------------------------------------------------------------------
+const MAX_PAGE_SIZE = 200;
+const BREACHED_SQL = `(t.status != 'resolved' and t.sla_deadline is not null and t.sla_deadline < now())`;
+
 ticketsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -41,17 +50,44 @@ ticketsRouter.get(
 
     const where = clauses.length ? `where ${clauses.join(" and ")}` : "";
 
+    const summary = (
+      await pool.query(
+        `select count(*)::int as total,
+                count(*) filter (where t.status = 'open')::int as open_count,
+                count(*) filter (where ${BREACHED_SQL})::int as breached_count
+         from tickets t
+         ${where}`,
+        params
+      )
+    ).rows[0];
+
+    const requestedPageSize = Number.parseInt(String(req.query.pageSize ?? ""), 10);
+    const paginated = Number.isFinite(requestedPageSize) && requestedPageSize > 0;
+    const pageSize = paginated ? Math.min(requestedPageSize, MAX_PAGE_SIZE) : Math.max(summary.total, 1);
+    const totalPages = Math.max(1, Math.ceil(summary.total / pageSize));
+    const requestedPage = Number.parseInt(String(req.query.page ?? ""), 10);
+    // clamp so e.g. narrowing a filter while on page 3 lands on the last real page
+    const page = Math.min(Math.max(Number.isFinite(requestedPage) ? requestedPage : 1, 1), totalPages);
+
     const { rows } = await pool.query(
-      `select t.*, a.name as assigned_agent_name,
-              (t.status != 'resolved' and t.sla_deadline is not null and t.sla_deadline < now()) as breached
+      `select t.*, a.name as assigned_agent_name, ${BREACHED_SQL} as breached
        from tickets t
        left join agents a on a.id = t.assigned_agent_id
        ${where}
-       order by t.created_at desc`,
-      params
+       order by t.created_at desc, t.id desc
+       limit $${params.length + 1} offset $${params.length + 2}`,
+      [...params, pageSize, (page - 1) * pageSize]
     );
 
-    res.json({ tickets: rows });
+    res.json({
+      tickets: rows,
+      total: summary.total,
+      openCount: summary.open_count,
+      breachedCount: summary.breached_count,
+      page,
+      pageSize,
+      totalPages,
+    });
   })
 );
 
@@ -63,7 +99,7 @@ ticketsRouter.get(
   asyncHandler(async (req, res) => {
     const { rows } = await pool.query(
       `select t.*, a.name as assigned_agent_name,
-              (t.status != 'resolved' and t.sla_deadline is not null and t.sla_deadline < now()) as breached
+              ${BREACHED_SQL} as breached
        from tickets t
        left join agents a on a.id = t.assigned_agent_id
        where t.id = $1`,
@@ -146,6 +182,20 @@ ticketsRouter.post(
     }
 
     res.status(201).json({ ticket });
+  })
+);
+
+// ----------------------------------------------------------------------------
+// POST /api/tickets/:id/sla-check — called by the frontend the moment a live
+// countdown hits 0. Applies the breach outcome right away (same handler as
+// the background sweep, so it's idempotent and race-safe); a no-op if the
+// ticket isn't actually due yet by the server's clock.
+// ----------------------------------------------------------------------------
+ticketsRouter.post(
+  "/:id/sla-check",
+  asyncHandler(async (req, res) => {
+    const outcome = await handleSlaBreach(req.params.id);
+    res.json({ outcome });
   })
 );
 

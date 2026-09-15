@@ -67,8 +67,21 @@ create table if not exists tickets (
 
   -- set once, the first time a breach escalation event is logged, so the
   -- background SLA sweep never double-logs the same breach
-  sla_breach_logged        boolean not null default false
+  sla_breach_logged        boolean not null default false,
+
+  -- what the SLA engine did the most recent time this ticket's clock hit 0
+  -- (see the outcome rules in server/src/services/sla.ts); null = never breached
+  sla_outcome              text
+                             check (sla_outcome in ('escalated', 'auto_resolved', 'restarted', 'breached_final')),
+  -- how many times the SLA engine has handled a breach on this ticket
+  sla_breach_count         int not null default 0
 );
+
+-- Upgrade path for databases created before SLA outcomes existed
+-- (create table if not exists above is a no-op on an existing table).
+alter table tickets add column if not exists sla_outcome text
+  check (sla_outcome in ('escalated', 'auto_resolved', 'restarted', 'breached_final'));
+alter table tickets add column if not exists sla_breach_count int not null default 0;
 
 create index if not exists idx_tickets_status on tickets(status);
 create index if not exists idx_tickets_category on tickets(category);

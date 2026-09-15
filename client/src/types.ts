@@ -1,6 +1,7 @@
 export type Role = "admin" | "agent";
 export type TicketStatus = "open" | "in_progress" | "resolved";
 export type Priority = "low" | "med" | "high" | "urgent";
+export type SlaOutcome = "escalated" | "auto_resolved" | "restarted" | "breached_final";
 
 export interface AuthedAgent {
   agentId: string;
@@ -34,6 +35,19 @@ export interface Ticket {
   suggested_kb_article_id: string | null;
   classification_source: "gemini" | "mock" | null;
   breached: boolean;
+  sla_outcome: SlaOutcome | null;
+  sla_breach_count: number;
+}
+
+export interface TicketPage {
+  tickets: Ticket[];
+  /** total / openCount / breachedCount describe the full filtered set, not just this page */
+  total: number;
+  openCount: number;
+  breachedCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface TicketEvent {
@@ -56,6 +70,8 @@ export interface AnalyticsSummary {
   slaBreachPct: number;
   slaBreachedCount: number;
   slaTotalWithDeadline: number;
+  slaCurrentlyOverdue: number;
+  slaOutcomes: { outcome: SlaOutcome; count: number; activeCount: number }[];
   ticketsByCategory: { category: string; count: number }[];
   ticketsByDay: { day: string; count: number }[];
   perAgentLoad: {

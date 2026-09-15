@@ -533,9 +533,25 @@ textarea {
 /* ---------------------------------------------------------------- charts */
 .stat-tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, …) keeps columns equal even when one tile's sub-text is long */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
+}
+
+/* Too narrow for five across: split into two even rows instead of an awkward
+   4 + 1 wrap — time/SLA metrics on top (2 x half width), the three status
+   counts below (3 x third width). */
+@media (max-width: 1180px) {
+  .stat-tiles {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .stat-tiles > :nth-child(-n + 2) {
+    grid-column: span 3;
+  }
+  .stat-tiles > :nth-child(n + 3) {
+    grid-column: span 2;
+  }
 }
 
 .stat-tile {
@@ -622,4 +638,86 @@ textarea {
   .stat-tiles {
     grid-template-columns: 1fr;
   }
+  .stat-tiles > .stat-tile {
+    grid-column: auto;
+  }
+}
+
+/* ---------------------------------------------------------------- sla outcomes */
+.sla-cell {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sla-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.sla-tag-escalated,
+.sla-outcome-escalated {
+  background: rgba(235, 104, 52, 0.15);
+  color: var(--status-serious);
+}
+.sla-tag-restarted,
+.sla-outcome-restarted {
+  background: rgba(42, 120, 214, 0.12);
+  color: var(--series-1);
+}
+.sla-outcome-auto_resolved {
+  background: rgba(137, 135, 129, 0.16);
+  color: var(--text-secondary);
+}
+.sla-outcome-breached_final {
+  background: rgba(208, 59, 59, 0.15);
+  color: var(--status-critical);
+}
+
+.timeline li.event-sla_escalated::before {
+  background: var(--status-serious);
+}
+.timeline li.event-sla_breached_final::before {
+  background: var(--status-critical);
+}
+.timeline li.event-sla_auto_resolved::before {
+  background: var(--status-good);
+}
+
+/* ---------------------------------------------------------------- pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pagination-range {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pagination-controls .btn {
+  min-width: 34px;
+  justify-content: center;
+}
+
+.pagination-gap {
+  color: var(--text-muted);
+  padding: 0 2px;
 }

@@ -1,4 +1,8 @@
+import pg from "pg";
 import { pool } from "../db.js";
+
+/** Either the shared pool or a checked-out client (for use inside a transaction). */
+export type Db = pg.Pool | pg.PoolClient;
 
 // ============================================================================
 // Auto-routing: assign each new ticket to the agent with the lowest
@@ -11,19 +15,23 @@ import { pool } from "../db.js";
 // agents globally rather than a per-category pool; see ARCHITECTURE.md.
 // ============================================================================
 
-export async function pickLeastLoadedAgent(): Promise<string | null> {
-  const { rows } = await pool.query(
-    `select id from agents where role = 'agent' order by current_workload asc, name asc limit 1`
+/** excludeAgentId lets SLA escalation pick a *different* agent than the current one. */
+export async function pickLeastLoadedAgent(excludeAgentId: string | null = null, db: Db = pool): Promise<string | null> {
+  const { rows } = await db.query(
+    `select id from agents
+     where role = 'agent' and ($1::uuid is null or id != $1::uuid)
+     order by current_workload asc, name asc limit 1`,
+    [excludeAgentId]
   );
   return rows[0]?.id ?? null;
 }
 
-export async function incrementWorkload(agentId: string) {
-  await pool.query(`update agents set current_workload = current_workload + 1 where id = $1`, [agentId]);
+export async function incrementWorkload(agentId: string, db: Db = pool) {
+  await db.query(`update agents set current_workload = current_workload + 1 where id = $1`, [agentId]);
 }
 
-export async function decrementWorkload(agentId: string) {
-  await pool.query(
+export async function decrementWorkload(agentId: string, db: Db = pool) {
+  await db.query(
     `update agents set current_workload = greatest(current_workload - 1, 0) where id = $1`,
     [agentId]
   );

@@ -30,9 +30,23 @@ two ways for two different purposes:
    `sla.ts`, a `setInterval` started at server boot) scans for tickets that
    just crossed their deadline and haven't been flagged yet
    (`sla_breach_logged = false`), inserts an `sla_breach` event into
-   `ticket_events`, and flips the flag so the same breach is never logged
-   twice. This is what actually produces the audit-trail entry the timeline
-   shows — the read-time boolean alone wouldn't create a persistent event.
+   `ticket_events`, and applies one **breach outcome** in a transaction
+   (`for update skip locked`, so a breach is never handled twice). This is
+   what actually produces the audit-trail entries the timeline shows — the
+   read-time boolean alone wouldn't create a persistent event.
+
+**Breach outcomes**: instead of every overdue ticket looking the same, each
+breach resolves to one of `escalated` (priority +1, reassigned to another
+agent, shorter escalated deadline), `auto_resolved` (low priority only),
+`restarted` (fresh full SLA clock), or `breached_final` (no action). The
+choice is a hash of ticket id + breach count mapped onto per-priority
+weights — stable for a given ticket, varied across tickets — and capped so
+a ticket can't be escalated/restarted forever. The full rules are in the
+comment block in `sla.ts`; the result is stored in `tickets.sla_outcome` /
+`sla_breach_count`. When a countdown hits 0 on screen, the frontend calls
+`POST /api/tickets/:id/sla-check` to apply the outcome immediately rather
+than waiting for the next 15-second sweep. The seed script replays the same
+rules over each seeded ticket's history.
 
 A real deployment would replace the in-process `setInterval` with a proper
 scheduled job (cron, Supabase Edge Function, etc.) since it only runs while

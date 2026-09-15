@@ -4,6 +4,7 @@ import { AnalyticsSummary } from "../types";
 import { StatTile } from "../components/charts/StatTile";
 import { VerticalBarChart } from "../components/charts/VerticalBarChart";
 import { HorizontalBarChart } from "../components/charts/HorizontalBarChart";
+import { SLA_OUTCOME_LABELS } from "../components/SlaOutcomeBadge";
 
 const SERIES_COLORS = [
   "var(--series-1)",
@@ -47,18 +48,25 @@ export function Analytics() {
       <div className="page-header">
         <div>
           <h1>Analytics</h1>
-          <div className="page-subtitle">{data.totals.total_tickets} tickets total, admin-only view</div>
+          <div className="page-subtitle">
+            All {data.totals.total_tickets} tickets (not limited by dashboard filters or pages), admin-only view
+          </div>
         </div>
       </div>
 
       <div className="stat-tiles">
-        <StatTile label="Avg. Resolution Time" value={formatMinutes(data.avgResolutionMinutes)} />
+        <StatTile
+          label="Avg. Resolution Time"
+          value={formatMinutes(data.avgResolutionMinutes)}
+          sub="Excludes auto-closed tickets"
+        />
         <StatTile
           label="SLA Breach Rate"
           value={`${data.slaBreachPct}%`}
-          sub={`${data.slaBreachedCount} of ${data.slaTotalWithDeadline} tickets`}
+          sub={`${data.slaBreachedCount} of ${data.slaTotalWithDeadline} ever breached · ${data.slaCurrentlyOverdue} overdue now`}
         />
         <StatTile label="Open Tickets" value={String(data.totals.open_count)} />
+        <StatTile label="In Progress" value={String(data.totals.in_progress_count)} />
         <StatTile label="Resolved Tickets" value={String(data.totals.resolved_count)} />
       </div>
 
@@ -82,12 +90,27 @@ export function Analytics() {
         </div>
 
         <div className="card chart-card" style={{ gridColumn: "1 / -1" }}>
+          <h3 className="chart-title">SLA Breach Outcomes</h3>
+          <HorizontalBarChart
+            data={data.slaOutcomes.map((o) => ({
+              label: SLA_OUTCOME_LABELS[o.outcome],
+              value: o.count,
+              sub: o.outcome === "auto_resolved" ? "closed automatically" : `${o.activeCount} still unresolved`,
+            }))}
+            valueFormatter={(v) => `${v} ticket${v === 1 ? "" : "s"}`}
+          />
+          <p className="muted" style={{ fontSize: 12, margin: "12px 0 0" }}>
+            The most recent action the SLA engine took when each ticket's clock hit 0.
+          </p>
+        </div>
+
+        <div className="card chart-card" style={{ gridColumn: "1 / -1" }}>
           <h3 className="chart-title">Per-Agent Load</h3>
           <HorizontalBarChart
             data={data.perAgentLoad.map((a) => ({
               label: a.name,
               value: a.current_workload,
-              sub: `${a.resolved_count} resolved`,
+              sub: `${a.resolved_count} resolved by agent`,
             }))}
             valueFormatter={(v) => `${v} active`}
           />

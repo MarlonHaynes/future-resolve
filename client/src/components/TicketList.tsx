@@ -4,7 +4,13 @@ import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { SlaCountdown } from "./SlaCountdown";
 
-export function TicketList({ tickets }: { tickets: Ticket[] }) {
+export function TicketList({
+  tickets,
+  onSlaExpire,
+}: {
+  tickets: Ticket[];
+  onSlaExpire?: (ticketId: string) => void;
+}) {
   const navigate = useNavigate();
 
   if (tickets.length === 0) {
@@ -37,7 +43,12 @@ export function TicketList({ tickets }: { tickets: Ticket[] }) {
             <td className="secondary-text">{t.category}</td>
             <td className="secondary-text">{t.assigned_agent_name ?? "Unassigned"}</td>
             <td>
-              <SlaCountdown deadline={t.sla_deadline} resolved={t.status === "resolved"} />
+              <SlaCountdown
+                deadline={t.sla_deadline}
+                resolved={t.status === "resolved"}
+                outcome={t.sla_outcome}
+                onExpire={onSlaExpire && (() => onSlaExpire(t.id))}
+              />
             </td>
             <td className="muted">{new Date(t.created_at).toLocaleDateString()}</td>
           </tr>
